@@ -1,0 +1,70 @@
+#-*-coding:utf-8-*-
+from ftplib import FTP
+import tarfile
+import os
+import time
+import subprocess
+ftp = FTP()
+#下载到本地的地址
+TOMCAT_HOME=r'/usr/local/tomcat8'
+down_dir = TOMCAT_HOME + '/webapps'
+
+#用于变更ftp上的目录
+ftp_dir = r'wine'
+#tar打开的源目标
+dest_tar = down_dir + '/wine.tar'
+
+
+
+def conne():
+    IP = '192.168.128.206'
+    port = '21'
+    username = 'ftpuser'
+    psswd = '123456qwert'
+    ftp.connect(IP,port)
+    ftp.login(username,psswd)
+conne()
+
+def update():
+    # 切换当前目录，作为FTP的下载目录用，ftp的下载方法不指定目录，直接下载到当前目录中
+    os.system(r'%s/bin/shutdown.sh'%TOMCAT_HOME)
+    os.system(r'rm -rf %s/webapps/*'%TOMCAT_HOME)
+    #这里需要加一个判断进程是否结束的判断，后期跟进
+    cat_stat = subprocess.Popen(['ps','-aux'],stdout=subprocess.PIPE,shell=True)
+    cat_stat1 = subprocess.Popen(['grep','tomcat'],stdin = cat_stat.stdout,stdout=subprocess.PIPE,shell=True)
+    cat_stat2 = cat_stat1.communicate()
+    print cat_stat2
+    os.chdir(down_dir)
+    data1 = ftp.nlst()
+    for file in data1:
+        fp = open(file, 'wb')
+        ftp.retrbinary('RETR %s' %file, fp.write)
+    	if file == 'new':
+            ftp.delete(file)
+
+	#打开tar文件并解压
+    tar = tarfile.open(dest_tar)
+    names = tar.getnames()
+    for name in names:
+        tar.extract(name, path=down_dir)
+    tar.close()
+    #删除tar
+    os.system(r'rm -rf %s/webapps/wine.tar' %TOMCAT_HOME)
+    os.system(r'\cp /usr/local/python_script/application.properties %s/webapps/wine/WEB-INF/classes'%TOMCAT_HOME)
+    os.system(r'\cp /usr/local/python_script/log4j2.xml %s/webapps/wine/WEB-INF/classes'%TOMCAT_HOME)
+    time.sleep(10)
+    os.system(r'%s/bin/startup.sh' % TOMCAT_HOME)
+
+print ftp.getwelcome().decode('gb2312')
+ftp.cwd(ftp_dir).decode('gb2312')
+list_ftp_dir = ftp.nlst()
+for list in list_ftp_dir:
+    if list == 'new':
+        print '有new这个文件，需要更新'
+        update()
+        break
+    else:
+        print '无需更新'
+        break
+
+ftp.close()
